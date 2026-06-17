@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { io } from "socket.io-client";
 
-const SOCKET_URL = "http://localhost:5001";
-
+const SOCKET_URL = process.env.REACT_APP_API_URL;
 function ChatPage() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
@@ -51,7 +50,7 @@ function ChatPage() {
     const fetchConversations = async () => {
       try {
         const res = await axios.get(
-          `http://localhost:5001/api/matches/${storedUser._id}`,
+          `${process.env.REACT_APP_API_URL}/api/matches/${storedUser._id}`,
         );
         setConversations(res.data.matches);
         if (res.data.matches.length > 0) {
@@ -78,7 +77,7 @@ function ChatPage() {
     const fetchMessages = async () => {
       try {
         const res = await axios.get(
-          `http://localhost:5001/api/messages/${currentUser._id}/${activeChat.id}`,
+          `${process.env.REACT_APP_API_URL}/api/messages/${currentUser._id}/${activeChat.id}`,
         );
         setMessages(res.data.messages);
       } catch (error) {

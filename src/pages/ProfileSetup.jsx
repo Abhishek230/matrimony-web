@@ -30,7 +30,7 @@ function ProfileSetup() {
       const storedUser = JSON.parse(localStorage.getItem("user"));
 
       const res = await axios.put(
-        "http://localhost:5001/api/users/update-profile",
+        `${process.env.REACT_APP_API_URL}/api/users/update-profile`,
         {
           userId: storedUser._id,
           ...formData,

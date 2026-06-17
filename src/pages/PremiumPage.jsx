@@ -53,7 +53,7 @@ function PremiumPage() {
 
       // Step 1: Create order on backend
       const { data } = await axios.post(
-        "http://localhost:5001/api/payments/create-order",
+        `${process.env.REACT_APP_API_URL} /api/payments/create-order`,
         {
           userId: storedUser._id,
           plan: plan.name,
@@ -72,7 +72,7 @@ function PremiumPage() {
           // Step 3: Verify payment on backend
           try {
             const verifyRes = await axios.post(
-              "http://localhost:5001/api/payments/verify",
+              `${process.env.REACT_APP_API_URL} /api/payments/verify`,
               {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,

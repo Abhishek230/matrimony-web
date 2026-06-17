@@ -19,7 +19,7 @@ function HomePage() {
         }
 
         const res = await axios.get(
-          `http://localhost:5001/api/matches/${storedUser._id}`,
+          `${process.env.REACT_APP_API_URL}/api/matches/${storedUser._id}`,
         );
         setMatches(res.data.matches);
       } catch (error) {

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const API_URL = "http://localhost:5001/api/auth";
+const API_URL = `${process.env.REACT_APP_API_URL}/api/auth`;
 
 function LoginPage() {
   const navigate = useNavigate();
