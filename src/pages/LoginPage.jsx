@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-
-const API_URL = `${process.env.REACT_APP_API_URL}/api/auth`;
+import { auth } from "../firebase";
+import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -11,22 +11,47 @@ function LoginPage() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [confirmationResult, setConfirmationResult] = useState(null);
+  const recaptchaRef = useRef(null);
+
+  const setupRecaptcha = () => {
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(
+        auth,
+        "recaptcha-container",
+        {
+          size: "invisible",
+          callback: () => {},
+          "expired-callback": () => {
+            window.recaptchaVerifier = null;
+          },
+        },
+      );
+    }
+    recaptchaRef.current = window.recaptchaVerifier;
+  };
 
   const handleSendOtp = async () => {
     if (phone.length !== 10) {
       setError("Please enter a valid 10-digit phone number");
       return;
     }
-
     setError("");
     setLoading(true);
-
     try {
-      const res = await axios.post(`${API_URL}/send-otp`, { phone });
-      console.log("OTP (for testing):", res.data.otp); // remove later
+      setupRecaptcha();
+      const phoneNumber = `+91${phone}`;
+      const confirmation = await signInWithPhoneNumber(
+        auth,
+        phoneNumber,
+        recaptchaRef.current,
+      );
+      setConfirmationResult(confirmation);
       setStep(2);
     } catch (err) {
-      setError(err.response?.data?.message || "Something went wrong");
+      console.error("OTP Error:", err);
+      setError(err.message || "Failed to send OTP. Please try again.");
+      window.recaptchaVerifier = null;
     } finally {
       setLoading(false);
     }
@@ -37,15 +62,18 @@ function LoginPage() {
       setError("Please enter the 6-digit OTP");
       return;
     }
-
     setError("");
     setLoading(true);
-
     try {
-      const res = await axios.post(`${API_URL}/verify-otp`, { phone, otp });
-      console.log("Logged in user:", res.data.user);
+      // Verify OTP with Firebase
+      await confirmationResult.confirm(otp);
 
-      // Save user info for later use
+      // After Firebase verification, create/find user in our backend
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/auth/firebase-login`,
+        { phone },
+      );
+
       localStorage.setItem("user", JSON.stringify(res.data.user));
 
       if (res.data.user.isProfileComplete) {
@@ -54,7 +82,8 @@ function LoginPage() {
         navigate("/profile-setup");
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Invalid OTP");
+      console.error("Verify Error:", err);
+      setError("Invalid OTP. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -62,8 +91,9 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-pink-50 to-white px-4">
+      {/* Invisible reCAPTCHA container */}
+      <div id="recaptcha-container" className="flex justify-center mb-4"></div>
       <div className="bg-white shadow-xl rounded-2xl p-8 w-full max-w-md">
-        {/* Logo */}
         <h1 className="text-3xl font-bold text-pink-600 text-center mb-2">
           💍 Bandhan
         </h1>
@@ -82,7 +112,6 @@ function LoginPage() {
             <h2 className="text-xl font-semibold text-gray-800 mb-4">
               Enter your phone number
             </h2>
-
             <div className="flex items-center border rounded-lg px-3 py-3 mb-4">
               <span className="text-gray-500 mr-2">🇮🇳 +91</span>
               <input
@@ -94,13 +123,12 @@ function LoginPage() {
                 className="flex-1 outline-none text-gray-800"
               />
             </div>
-
             <button
               onClick={handleSendOtp}
               disabled={loading}
               className="w-full bg-pink-600 text-white py-3 rounded-full font-semibold hover:bg-pink-700 disabled:opacity-50"
             >
-              {loading ? "Sending..." : "Send OTP"}
+              {loading ? "Sending OTP..." : "Send OTP"}
             </button>
           </>
         )}
@@ -110,11 +138,9 @@ function LoginPage() {
             <h2 className="text-xl font-semibold text-gray-800 mb-2">
               Enter OTP
             </h2>
-            <p className="text-gray-500 mb-4">Sent to +91 {phone}</p>
-            <p className="text-xs text-gray-400 mb-4">
-              💡 For testing: check your backend terminal for the OTP
+            <p className="text-gray-500 mb-4">
+              Real OTP sent to <strong>+91 {phone}</strong> 📱
             </p>
-
             <input
               type="text"
               placeholder="6-digit OTP"
@@ -123,7 +149,6 @@ function LoginPage() {
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
               className="w-full border rounded-lg px-3 py-3 mb-4 outline-none text-gray-800 tracking-widest text-center text-lg"
             />
-
             <button
               onClick={handleVerifyOtp}
               disabled={loading}
@@ -131,9 +156,12 @@ function LoginPage() {
             >
               {loading ? "Verifying..." : "Verify & Login"}
             </button>
-
             <button
-              onClick={() => setStep(1)}
+              onClick={() => {
+                setStep(1);
+                setOtp("");
+                setError("");
+              }}
               className="w-full text-pink-600 text-sm font-medium hover:underline"
             >
               ← Change phone number
